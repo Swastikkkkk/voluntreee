@@ -21,6 +21,7 @@ import {
   FaUserCircle,
 } from "react-icons/fa";
 import WhatsAppChatButton from "./WhatsAppChatButton";
+import DubUploader from "./DubUploader";
 
 const menuItems = [
   {
@@ -243,8 +244,10 @@ const VolunteerHome = () => {
               Take a Quiz
             </button>
             <WhatsAppChatButton />
+         
           </div>
         </div>
+           <DubUploader/>
       </div>
     </div>
   );
