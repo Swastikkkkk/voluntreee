@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "../config/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 const VolunteerDashboard = () => {
@@ -27,10 +27,18 @@ const VolunteerDashboard = () => {
     fetchProfile();
   }, [navigate]);
 
-  // Fetch announcements (from localStorage for now)
+  // Fetch announcements from Firestore
   useEffect(() => {
-    const saved = localStorage.getItem("announcements");
-    if (saved) setAnnouncements(JSON.parse(saved));
+    const fetchAnnouncements = async () => {
+      const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"));
+      const querySnapshot = await getDocs(q);
+      const data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ ...doc.data(), id: doc.id });
+      });
+      setAnnouncements(data);
+    };
+    fetchAnnouncements();
   }, []);
 
   if (loading) return <div className="p-8">Loading...</div>;

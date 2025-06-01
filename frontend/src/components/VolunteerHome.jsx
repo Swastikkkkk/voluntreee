@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../config/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth"; // <-- Add signOut
 import {
   collection,
   query,
@@ -21,6 +21,7 @@ import {
   FaUserCircle,
 } from "react-icons/fa";
 import WhatsAppChatButton from "./WhatsAppChatButton";
+
 const menuItems = [
   {
     label: "Dashboard",
@@ -76,7 +77,7 @@ const VolunteerHome = () => {
         id: doc.id,
         ...doc.data(),
       }));
-      console.log("Announcements fetched:", ann);  // <--- debug log here
+      console.log("Announcements fetched:", ann);
       setAnnouncements(ann);
     });
     return () => unsubscribe();
@@ -104,6 +105,17 @@ const VolunteerHome = () => {
       minute: "2-digit",
       hour12: true,
     });
+  };
+
+  // Logout function
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login"); // Redirect to login page after logout
+    } catch (error) {
+      console.error("Error logging out:", error);
+      alert("Failed to log out: " + error.message);
+    }
   };
 
   if (loading) {
@@ -157,7 +169,7 @@ const VolunteerHome = () => {
         <div className="mb-6 mx-2">
           <button
             className="flex items-center gap-3 w-full px-4 py-2 rounded-lg bg-green-800 hover:bg-green-700 transition text-white"
-            // onClick={handleLogout}
+            onClick={handleLogout} // <-- Connect handleLogout here
           >
             <FaSignOutAlt className="text-lg" />
             {isOpen && <span>Logout</span>}
@@ -223,7 +235,7 @@ const VolunteerHome = () => {
           </div>
 
           {/* Take a Quiz Button */}
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-4"> {/* Added gap-4 for spacing */}
             <button
               className="px-10 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl font-bold text-xl shadow-lg hover:from-green-700 hover:to-green-800 transition duration-200"
               onClick={() => navigate("/quiz")}

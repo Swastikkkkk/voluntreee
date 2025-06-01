@@ -1,17 +1,10 @@
 import React, { useState, useEffect } from "react";
-
-const STORAGE_KEY = "opportunities";
-const getOpportunities = () => {
-  const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
-};
-const saveOpportunities = (ops) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ops));
-  window.dispatchEvent(new Event("opportunitiesChanged"));
-};
+import { db } from "../config/firebase";
+import { collection, addDoc, getDocs, doc, deleteDoc, orderBy, query } from "firebase/firestore";
 
 const OpportunitiesSection = () => {
-  const [opportunities, setOpportunities] = useState(getOpportunities());
+  const [opportunities, setOpportunities] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -20,30 +13,47 @@ const OpportunitiesSection = () => {
     location: ""
   });
 
+  // Fetch opportunities from Firestore
   useEffect(() => {
-    const sync = () => setOpportunities(getOpportunities());
-    window.addEventListener("opportunitiesChanged", sync);
-    return () => window.removeEventListener("opportunitiesChanged", sync);
+    const fetchOpportunities = async () => {
+      const q = query(collection(db, "opportunities"), orderBy("date", "desc"));
+      const querySnapshot = await getDocs(q);
+      const data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ ...doc.data(), id: doc.id });
+      });
+      setOpportunities(data);
+      setLoading(false);
+    };
+    fetchOpportunities();
   }, []);
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.title || !form.date || !form.time || !form.location) return;
     const newOp = {
       ...form,
-      id: Date.now().toString()
+      timestamp: new Date().toISOString() // Optional, for sorting if needed
     };
-    const updated = [newOp, ...opportunities];
-    setOpportunities(updated);
-    saveOpportunities(updated);
-    setForm({ title: "", description: "", date: "", time: "", location: "" });
+    try {
+      const docRef = await addDoc(collection(db, "opportunities"), newOp);
+      setOpportunities([{ ...newOp, id: docRef.id }, ...opportunities]);
+      setForm({ title: "", description: "", date: "", time: "", location: "" });
+    } catch (error) {
+      console.error("Error adding opportunity:", error);
+    }
   };
 
-  const handleRemove = (id) => {
-    const updated = opportunities.filter((op) => op.id !== id);
-    setOpportunities(updated);
-    saveOpportunities(updated);
+  const handleRemove = async (id) => {
+    try {
+      await deleteDoc(doc(db, "opportunities", id));
+      setOpportunities(opportunities.filter((op) => op.id !== id));
+    } catch (error) {
+      console.error("Error removing opportunity:", error);
+    }
   };
+
+  if (loading) return <div className="p-4">Loading opportunities...</div>;
 
   return (
     <div className="bg-white rounded-xl shadow p-6 mt-8">
@@ -54,6 +64,7 @@ const OpportunitiesSection = () => {
           placeholder="Title"
           value={form.title}
           onChange={e => setForm({ ...form, title: e.target.value })}
+          required
         />
         <input
           className="border p-2 rounded"
@@ -66,18 +77,21 @@ const OpportunitiesSection = () => {
           className="border p-2 rounded"
           value={form.date}
           onChange={e => setForm({ ...form, date: e.target.value })}
+          required
         />
         <input
           type="time"
           className="border p-2 rounded"
           value={form.time}
           onChange={e => setForm({ ...form, time: e.target.value })}
+          required
         />
         <input
           className="border p-2 rounded"
           placeholder="Location"
           value={form.location}
           onChange={e => setForm({ ...form, location: e.target.value })}
+          required
         />
         <button
           type="submit"
@@ -104,7 +118,7 @@ const OpportunitiesSection = () => {
             </div>
             <button
               onClick={() => handleRemove(op.id)}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+              className="bg-red-600 hover:bg-red-7text-white px-3 py-1 rounded"
             >
               Remove
             </button>

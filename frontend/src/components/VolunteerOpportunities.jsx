@@ -1,35 +1,41 @@
 import React, { useEffect, useState } from "react";
-
-// Helper to get and set participation per user (by userId)
-const getParticipation = (userId) => {
-  const data = localStorage.getItem(`participation_${userId}`);
-  return data ? JSON.parse(data) : [];
-};
-const saveParticipation = (userId, participation) => {
-  localStorage.setItem(`participation_${userId}`, JSON.stringify(participation));
-};
+import { db } from "../config/firebase";
+import { collection, getDocs, query, orderBy, doc, setDoc, getDoc } from "firebase/firestore";
 
 const VolunteerOpportunities = ({ userId }) => {
   const [opportunities, setOpportunities] = useState([]);
-  const [participation, setParticipation] = useState(getParticipation(userId));
+  const [participation, setParticipation] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState(null);
 
+  // Fetch opportunities from Firestore
   useEffect(() => {
-    // Fetch opportunities from localStorage
-    const data = localStorage.getItem("opportunities");
-    setOpportunities(data ? JSON.parse(data) : []);
-    // Listen for updates (optional, for live sync)
-    const sync = () => {
-      const updated = localStorage.getItem("opportunities");
-      setOpportunities(updated ? JSON.parse(updated) : []);
+    const fetchOpportunities = async () => {
+      const q = query(collection(db, "opportunities"), orderBy("date", "desc"));
+      const querySnapshot = await getDocs(q);
+      const data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ ...doc.data(), id: doc.id });
+      });
+      setOpportunities(data);
+      setLoading(false);
     };
-    window.addEventListener("opportunitiesChanged", sync);
-    return () => window.removeEventListener("opportunitiesChanged", sync);
+    fetchOpportunities();
   }, []);
 
-  // Sync participation when userId changes
+  // Fetch participation from Firestore
   useEffect(() => {
-    setParticipation(getParticipation(userId));
+    const fetchParticipation = async () => {
+      if (!userId) return;
+      const docRef = doc(db, "participation", userId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setParticipation(docSnap.data().confirmedOpportunities || []);
+      } else {
+        setParticipation([]);
+      }
+    };
+    fetchParticipation();
   }, [userId]);
 
   // Handle participation confirmation
@@ -37,16 +43,28 @@ const VolunteerOpportunities = ({ userId }) => {
     setConfirmingId(id);
   };
 
-  const confirmParticipation = (id) => {
+  const confirmParticipation = async (id) => {
+    if (!userId) {
+      alert("You must be logged in to confirm participation.");
+      return;
+    }
     const updated = [...participation, id];
     setParticipation(updated);
-    saveParticipation(userId, updated);
+    try {
+      await setDoc(doc(db, "participation", userId), {
+        confirmedOpportunities: updated
+      });
+    } catch (error) {
+      alert("Error saving participation: " + error.message);
+    }
     setConfirmingId(null);
   };
 
   const cancelParticipation = () => {
     setConfirmingId(null);
   };
+
+  if (loading) return <div className="p-10 text-center">Loading opportunities...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 py-10 px-2">
@@ -90,7 +108,7 @@ const VolunteerOpportunities = ({ userId }) => {
               <div className="mt-4">
                 {!participation.includes(op.id) ? (
                   <button
-                    className="w-full bg-gradient-to-r from-green-500 to-green-700 text-white font-semibold py-2 rounded-xl shadow hover:from-green-600 hover:to-green-800 transition"
+                    className="w-full bg-gradient-to-r from-green-500 to-green-7text-white font-semibold py-2 rounded-xl shadow hover:from-green-600 hover:to-green-800 transition"
                     onClick={() => handleParticipation(op.id)}
                   >
                     I want to participate!

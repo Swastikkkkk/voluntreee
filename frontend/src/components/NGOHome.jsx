@@ -1,10 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, ResponsiveContainer,
 } from "recharts";
 import OpportunitiesSection from "./OpportunitiesSection";
 import ParticipantsChart from "./ParticipantsChart";
-// Mock stats and data
+import { db } from "../config/firebase";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+  orderBy,
+  query
+} from "firebase/firestore";
+
 const stats = {
   volunteers: 120,
   events: 18,
@@ -37,12 +48,23 @@ const pieColors = ["#27ae60", "#229954", "#52be80", "#b7e4c7"];
 
 const NGOHome = () => {
   const [announcement, setAnnouncement] = useState("");
-  const [all, setAll] = useState(() => {
-    const saved = localStorage.getItem("announcements");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [all, setAll] = useState([]);
   const [editIndex, setEditIndex] = useState(null);
   const [editMessage, setEditMessage] = useState("");
+  const [editDocId, setEditDocId] = useState(null);
+
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      const q = query(collection(db, "announcements"), orderBy("timestamp", "desc"));
+      const querySnapshot = await getDocs(q);
+      const data = [];
+      querySnapshot.forEach((doc) => {
+        data.push({ ...doc.data(), id: doc.id });
+      });
+      setAll(data);
+    };
+    fetchAnnouncements();
+  }, []);
 
   const formatDate = (iso) => {
     if (!iso) return "";
@@ -58,93 +80,91 @@ const NGOHome = () => {
     });
   };
 
-  // Helper to sync announcements everywhere
-  const syncAnnouncements = (updated) => {
-    localStorage.setItem("announcements", JSON.stringify(updated));
-    window.dispatchEvent(new Event("announcementsChanged"));
-  };
-
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!announcement.trim()) return;
     const newEntry = {
       message: announcement,
       timestamp: new Date().toISOString()
     };
-    const updated = [newEntry, ...all];
-    setAll(updated);
-    syncAnnouncements(updated);
+    const docRef = await addDoc(collection(db, "announcements"), newEntry);
+    setAll([{ ...newEntry, id: docRef.id }, ...all]);
     setAnnouncement("");
   };
 
-  const handleDelete = (idx) => {
-    const updated = all.filter((_, i) => i !== idx);
-    setAll(updated);
-    syncAnnouncements(updated);
+  const handleDelete = async (idx) => {
+    const docId = all[idx].id;
+    await deleteDoc(doc(db, "announcements", docId));
+    setAll(all.filter((_, i) => i !== idx));
   };
 
   const handleEdit = (idx) => {
     setEditIndex(idx);
     setEditMessage(all[idx].message);
+    setEditDocId(all[idx].id);
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+    await updateDoc(doc(db, "announcements", editDocId), {
+      message: editMessage
+    });
     const updated = all.map((item, i) =>
       i === editIndex ? { ...item, message: editMessage } : item
     );
     setAll(updated);
-    syncAnnouncements(updated);
     setEditIndex(null);
     setEditMessage("");
+    setEditDocId(null);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-green-50">
-      <div className="p-6 flex flex-col items-center">
-        <h2 className="text-2xl font-semibold mb-6 text-green-900">Welcome, NGO Partner!</h2>
-        <div className="w-full max-w-7xl flex flex-col md:flex-row gap-8">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 via-white to-green-100 p-6">
+      <div className="max-w-7xl w-full mx-auto">
+        <h2 className="text-3xl font-bold mb-8 text-green-900">Welcome, NGO Partner!</h2>
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Left: Announcements */}
-          <div className="flex-1 max-w-lg w-full flex flex-col gap-6">
-            {/* Post Announcement */}
-            <div className="bg-green-50 p-4 rounded-lg shadow">
-              <h3 className="text-xl font-bold text-green-800 mb-2">Post Announcement</h3>
+          <div className="flex-1 max-w-2xl w-full flex flex-col gap-6">
+            {/* Post Announcement Card */}
+            <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6">
+              <h3 className="text-xl font-bold text-green-800 mb-4">Post Announcement</h3>
               <textarea
                 value={announcement}
                 onChange={(e) => setAnnouncement(e.target.value)}
                 placeholder="Enter announcement here..."
-                className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-green-600"
-                rows={3}
+                className="w-full p-3 border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition"
+                rows={4}
               />
               <button
                 onClick={handlePost}
-                className="mt-4 px-6 py-2 bg-green-700 text-white rounded hover:bg-green-800"
+                className="mt-4 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg font-semibold hover:from-green-700 hover:to-green-800 transition shadow-md"
               >
-                Post
+                Post Announcement
               </button>
             </div>
-            {/* All Announcements */}
-            <div className="bg-white p-4 rounded-lg shadow flex-1">
-              <h3 className="text-lg font-semibold mb-2 text-green-900">All Announcements</h3>
-              <ul className="space-y-4 text-green-900">
+            {/* All Announcements Card */}
+            <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex-1">
+              <h3 className="text-xl font-bold text-green-800 mb-4">All Announcements</h3>
+              <ul className="space-y-4">
                 {all.length ? (
                   all.map((item, index) => (
-                    <li key={index} className="border-b pb-2">
+                    <li key={item.id} className="border-b border-green-100 pb-4 last:border-b-0">
                       {editIndex === index ? (
-                        <div>
+                        <div className="mb-4">
                           <textarea
                             value={editMessage}
                             onChange={(e) => setEditMessage(e.target.value)}
-                            className="w-full p-2 border rounded mb-2"
+                            className="w-full p-3 border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition"
+                            rows={3}
                           />
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 mt-2">
                             <button
                               onClick={handleUpdate}
-                              className="px-4 py-1 bg-green-700 text-white rounded"
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                             >
                               Update
                             </button>
                             <button
                               onClick={() => setEditIndex(null)}
-                              className="px-4 py-1 bg-gray-300 text-black rounded"
+                              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
                             >
                               Cancel
                             </button>
@@ -153,21 +173,21 @@ const NGOHome = () => {
                       ) : (
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="font-medium">{item.message}</span>
-                            <div className="text-sm text-gray-500">
+                            <p className="font-medium text-green-900">{item.message}</p>
+                            <p className="text-sm text-gray-500 mt-1">
                               {formatDate(item.timestamp)}
-                            </div>
+                            </p>
                           </div>
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEdit(index)}
-                              className="text-blue-600 hover:underline"
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleDelete(index)}
-                              className="text-red-600 hover:underline"
+                              className="text-red-600 hover:text-red-800 hover:underline"
                             >
                               Delete
                             </button>
@@ -177,42 +197,41 @@ const NGOHome = () => {
                     </li>
                   ))
                 ) : (
-                  <li className="text-green-700">No announcements posted yet.</li>
+                  <li className="text-green-700 italic">No announcements posted yet.</li>
                 )}
               </ul>
               <OpportunitiesSection />
-              
-            <ParticipantsChart />
+              <ParticipantsChart />
             </div>
           </div>
           {/* Right: Stats, Best Employee, Charts */}
           <div className="flex-[2] flex flex-col gap-6">
             {/* Stats cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Volunteers</span>
                 <span className="text-3xl font-bold mt-2">{stats.volunteers}</span>
               </div>
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Events</span>
                 <span className="text-3xl font-bold mt-2">{stats.events}</span>
               </div>
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Donations (₹)</span>
                 <span className="text-3xl font-bold mt-2">{stats.donations.toLocaleString()}</span>
               </div>
             </div>
             {/* New Stats: Lives Impacted, Hours Spent, Domains */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Lives Impacted</span>
                 <span className="text-3xl font-bold mt-2">{stats.livesImpacted}</span>
               </div>
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Volunteer Hours</span>
                 <span className="text-3xl font-bold mt-2">{stats.hoursSpent}</span>
               </div>
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="text-green-700 font-semibold text-lg">Domains Served</span>
                 <ul className="mt-2 text-green-900 text-sm space-y-1">
                   {stats.domains.map((d) => (
@@ -222,7 +241,7 @@ const NGOHome = () => {
               </div>
             </div>
             {/* Best Employee */}
-            <div className="bg-green-100 rounded-xl shadow p-6 flex flex-col items-center max-w-xs">
+            <div className="bg-green-100 rounded-xl shadow-lg border border-green-200 p-6 flex flex-col items-center max-w-xs">
               <img src={stats.bestEmployee.image} alt="Best Employee" className="w-16 h-16 rounded-full mb-2"/>
               <span className="font-bold text-green-900">{stats.bestEmployee.name}</span>
               <span className="text-green-700 text-sm">{stats.bestEmployee.role}</span>
@@ -231,7 +250,7 @@ const NGOHome = () => {
             {/* Charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Pie Chart */}
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="font-semibold text-green-800 mb-2">Hours by Domain</span>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
@@ -254,7 +273,7 @@ const NGOHome = () => {
                 </ResponsiveContainer>
               </div>
               {/* Bar Chart */}
-              <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+              <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 flex flex-col items-center">
                 <span className="font-semibold text-green-800 mb-2">Event Attendance</span>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={attendanceData}>

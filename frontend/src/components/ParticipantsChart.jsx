@@ -1,33 +1,47 @@
 import React, { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
+import { db } from "../config/firebase";
+import { collection, getDocs, query, orderBy, onSnapshot } from "firebase/firestore";
 
 const ParticipantsChart = () => {
   const [data, setData] = useState([]);
 
-  // Aggregate participation data
   useEffect(() => {
-    const syncData = () => {
-      const opportunities = JSON.parse(localStorage.getItem("opportunities") || "[]");
-      const participationKeys = Object.keys(localStorage).filter(key => key.startsWith("participation_"));
-      const allParticipations = participationKeys.map(key => JSON.parse(localStorage.getItem(key) || "[]"));
-      const counts = opportunities.map(op => {
-        const count = allParticipations.reduce(
-          (sum, arr) => sum + (arr.includes(op.id) ? 1 : 0),
-          0
-        );
-        return {
-          name: op.title.length > 18 ? op.title.slice(0, 16) + "…" : op.title,
-          participants: count,
-        };
+    let unsubscribeParticipation;
+
+    const fetchData = async () => {
+      // 1. Fetch all opportunities (can use getDocs since opportunities change less often)
+      const opportunitiesQuery = query(collection(db, "opportunities"), orderBy("date", "desc"));
+      const opportunitiesSnapshot = await getDocs(opportunitiesQuery);
+      const opportunities = opportunitiesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+      // 2. Listen for real-time changes in participation
+      const participationQuery = collection(db, "participation");
+      unsubscribeParticipation = onSnapshot(participationQuery, (snapshot) => {
+        const allParticipations = [];
+        snapshot.forEach(doc => {
+          const confirmed = doc.data().confirmedOpportunities || [];
+          allParticipations.push(...confirmed);
+        });
+
+        // 3. Count participation per opportunity
+        const counts = opportunities.map(op => {
+          const count = allParticipations.filter(id => id === op.id).length;
+          return {
+            name: op.title.length > 18 ? op.title.slice(0, 16) + "…" : op.title,
+            participants: count,
+          };
+        });
+        console.log("Chart data:", counts); // Debug log
+        setData(counts);
       });
-      setData(counts);
     };
-    syncData();
-    window.addEventListener("opportunitiesChanged", syncData);
-    window.addEventListener("storage", syncData);
+
+    fetchData();
+
+    // Cleanup
     return () => {
-      window.removeEventListener("opportunitiesChanged", syncData);
-      window.removeEventListener("storage", syncData);
+      if (unsubscribeParticipation) unsubscribeParticipation();
     };
   }, []);
 

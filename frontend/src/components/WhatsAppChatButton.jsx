@@ -1,6 +1,6 @@
 import React from "react";
 
-const adminPhone = "919818851629"; // Replace with your admin's number (country code, no +)
+const adminPhone = "919971872399"; // Replace with your admin's number (country code, no +)
 
 export default function WhatsAppChatButton() {
   return (

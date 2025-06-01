@@ -12,7 +12,7 @@ import VolunteerProfile from "./components/VolunteerProfile";
 import QuizHome from "./components/QuizHome";
 import VolunteerDashboard from "./components/VolunteerDashboard";
 import Communication from "./components/Communication";
-import VolunteerOpportunities from "./components/VolunteerOpportunities";
+import VolunteerOpportunitiesWrapper from "./components/VolunteerOpportunitiesWrapper"; // <-- Use the wrapper
 
 const App = () => {
   return (
@@ -28,11 +28,9 @@ const App = () => {
         <Route path="/quiz/geography" element={<GeographyQuiz />} />
         <Route path="/quiz/math" element={<MathQuiz />} />
         <Route path="/volunteer/profile/:id" element={<VolunteerProfile />} />
-      <Route path="/volunteer-dashboard" element={<VolunteerDashboard />} />
-      <Route path="/communication-test" element={<Communication />}/>
-      
-      <Route path="/opportunities" element={<VolunteerOpportunities />} />
-
+        <Route path="/volunteer-dashboard" element={<VolunteerDashboard />} />
+        <Route path="/communication-test" element={<Communication />} />
+        <Route path="/opportunities" element={<VolunteerOpportunitiesWrapper />} /> 
       </Routes>
     </Router>
   );
