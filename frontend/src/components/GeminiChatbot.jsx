@@ -10,7 +10,7 @@ const GeminiChatbot = () => {
   const [userName, setUserName] = useState("");
   const [showChat, setShowChat] = useState(false); // For animation
 
-  const API_KEY = "AIzaSyBCBlWovL-76USdlu5IhR_iy1438BWaSlA";
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // Use environment variable for API key
 
   // Fetch user's name from Firestore on mount
   useEffect(() => {

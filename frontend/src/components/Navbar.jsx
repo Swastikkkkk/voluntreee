@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import image1 from "../assets/image.jpg";
 
-const API_KEY = "AIzaSyB39IqC2w3zr9SIbAsf3AWyEwD9niQ93vU";
+  const API_KEY = "AIzaSyB39IqC2w3zr9SIbAsf3AWyEwD9niQ93vU";
 
 const Navbar = () => {
   const scrollToSection = (id) => {
@@ -91,7 +91,7 @@ const Navbar = () => {
     setSelectedLang(lang);
     localStorage.setItem("selectedLang", lang);
     1;
-    translatePage(lang);
+    translatePage(lang);  
   };
 
  

@@ -5,23 +5,33 @@ import ImagesSection from "./ImageSection";
 import PricingSection from "./PricingSection.jsx";
 import Footer from "./Footer.jsx";
 import GeminiChatbot from "./GeminiChatbot.jsx";
-import PhotoUploader from "./PhotoUploader.jsx";
 
+import FrontlineWorker from "./FrontlineWorker";
 
-
-const Landingpage = () => {
+const Landingpage = ({ simplified }) => {
   return (
     <>
       <Navbar />
-      <Herosection />
-      <ImagesSection />
-      <GeminiChatbot />
-      <PhotoUploader />
-      <PricingSection />
+
+      {simplified && (
+        <div style={{ backgroundColor: '#ffeeba', padding: '10px', textAlign: 'center' }}>
+          ⚠️ Slow Internet Detected. You're viewing a simplified version.
+        </div>
+      )}
+
+      {simplified && <FrontlineWorker />}
+
+      {!simplified && (
+        <>
+          <Herosection />
+          <ImagesSection />
+          <GeminiChatbot />
+        
+          <PricingSection />
+        </>
+      )}
+
       <Footer />
-     
-      
-      
     </>
   );
 };
