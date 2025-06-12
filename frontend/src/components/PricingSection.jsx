@@ -1,74 +1,74 @@
 import React, { useState } from 'react';
 
+const STRIPE_CONFIG = {
+  publishableKey: "pk_test_51RQhMx070ajDSpWDCpl3Mm5Rvd9Du610u3C1Mz0qLnWKRr638XMGyWAX5RgncNVciSwlFnt2FOYwXIafQMTmyUrR009OeVG9Fj", // Replace with your Stripe publishable key
+  priceIds: {
+    growth: "price_1RRnMx070ajDSpWDWYyRORJR", // Replace with your Growth plan price ID
+    pro: "price_1RRnK0070ajDSpWDpGqJoKI0" // Replace with your Pro plan price ID
+  }
+};
+
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "₹0",
+    period: "/month",
+    description: "Perfect for small NGOs getting started",
+    features: [
+      "Up to 50 volunteers",
+      "Basic event management",
+      "Email notifications",
+      "Community support",
+      "Basic analytics",
+      "Mobile app access"
+    ],
+    buttonText: "Get Started Free",
+    popular: false,
+    priceId: null
+  },
+  {
+    name: "Growth",
+    price: "₹2,399",
+    period: "/month",
+    description: "Ideal for growing organizations",
+    features: [
+      "Up to 500 volunteers",
+      "Advanced event management",
+      "SMS & Email notifications",
+      "Priority support",
+      "Advanced analytics",
+      "Custom branding",
+      "Volunteer certificates",
+      "Team collaboration tools"
+    ],
+    buttonText: "Start Growth Plan",
+    popular: true,
+    priceId: STRIPE_CONFIG.priceIds.growth
+  },
+  {
+    name: "Pro",
+    price: "₹8,199",
+    period: "/month",
+    description: "For large NGOs with complex needs",
+    features: [
+      "Unlimited volunteers",
+      "Enterprise event management",
+      "Multi-channel notifications",
+      "24/7 dedicated support",
+      "Custom analytics dashboard",
+      "White-label solution",
+      "API access",
+      "Advanced integrations",
+      "Custom training sessions"
+    ],
+    buttonText: "Start Pro Plan",
+    popular: false,
+    priceId: STRIPE_CONFIG.priceIds.pro
+  }
+];
+
 const PricingSection = () => {
   const [loading, setLoading] = useState(null);
-
-  const STRIPE_CONFIG = {
-    publishableKey: "pk_test_51RQhMx070ajDSpWDCpl3Mm5Rvd9Du610u3C1Mz0qLnWKRr638XMGyWAX5RgncNVciSwlFnt2FOYwXIafQMTmyUrR009OeVG9Fj", // Replace with your Stripe publishable key
-    priceIds: {
-      growth: "price_1RRnMx070ajDSpWDWYyRORJR", // Replace with your Growth plan price ID
-      pro: "price_1RRnK0070ajDSpWDpGqJoKI0" // Replace with your Pro plan price ID
-    }
-  };
-
-  const pricingPlans = [
-    {
-      name: "Free",
-      price: "$0",
-      period: "/month",
-      description: "Perfect for small NGOs getting started",
-      features: [
-        "Up to 50 volunteers",
-        "Basic event management",
-        "Email notifications",
-        "Community support",
-        "Basic analytics",
-        "Mobile app access"
-      ],
-      buttonText: "Get Started Free",
-      popular: false,
-      priceId: null
-    },
-    {
-      name: "Growth",
-      price: "$29",
-      period: "/month",
-      description: "Ideal for growing organizations",
-      features: [
-        "Up to 500 volunteers",
-        "Advanced event management",
-        "SMS & Email notifications",
-        "Priority support",
-        "Advanced analytics",
-        "Custom branding",
-        "Volunteer certificates",
-        "Team collaboration tools"
-      ],
-      buttonText: "Start Growth Plan",
-      popular: true,
-      priceId: "price_1RRnMx070ajDSpWDWYyRORJR"
-    },
-    {
-      name: "Pro",
-      price: "$99",
-      period: "/month",
-      description: "For large NGOs with complex needs",
-      features: [
-        "Unlimited volunteers",
-        "Enterprise event management",
-        "Multi-channel notifications",
-        "24/7 dedicated support",
-        "Custom analytics dashboard",
-        "White-label solution",
-        "API access",
-        "Advanced integrations",
-        "Custom training sessions"
-      ],
-      buttonText: "Start Pro Plan",
-      popular: false,
-      priceId:"price_1RRnK0070ajDSpWDpGqJoKI0" 
-    }
-  ];
 
   const handleSubscription = async (priceId, planName) => {
     if (!priceId) {
@@ -97,8 +97,11 @@ const PricingSection = () => {
 
       const stripe = window.Stripe(STRIPE_CONFIG.publishableKey);
 
+      // Use .env variable for backend URL
+      const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:4242";
+
       // Create Checkout Session
-      const response = await fetch('http://localhost:4242/create-checkout-session', {
+      const response = await fetch(`${apiUrl}/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,13 +111,19 @@ const PricingSection = () => {
 
       if (!response.ok) throw new Error('Failed to create checkout session');
 
-      const { sessionId } = await response.json();
+      const { sessionId, url } = await response.json();
 
-      const { error } = await stripe.redirectToCheckout({ sessionId });
-
-      if (error) {
-        console.error('Stripe error:', error);
-        alert('Payment failed. Please try again.');
+      // If backend returns a Stripe Checkout URL, redirect to it; otherwise, use sessionId with Stripe.js
+      if (url) {
+        window.location.href = url;
+      } else if (sessionId) {
+        const { error } = await stripe.redirectToCheckout({ sessionId });
+        if (error) {
+          console.error('Stripe error:', error);
+          alert('Payment failed. Please try again.');
+        }
+      } else {
+        throw new Error('No sessionId or url returned from backend.');
       }
     } catch (err) {
       console.error('Subscription error:', err);
@@ -125,7 +134,7 @@ const PricingSection = () => {
   };
 
   return (
-    <section className="py-16 px-4 bg-gray-50" id = "pricing">
+    <section className="py-16 px-4 bg-gray-50" id="pricing">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
@@ -136,7 +145,6 @@ const PricingSection = () => {
             From small community groups to large organizations.
           </p>
         </div>
-
         <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
           {pricingPlans.map((plan, index) => (
             <div
@@ -216,5 +224,5 @@ const PricingSection = () => {
     </section>
   );
 };
-  
+
 export default PricingSection;
