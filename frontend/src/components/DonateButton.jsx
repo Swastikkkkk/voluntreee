@@ -28,7 +28,7 @@ const ExpandableDonateButton = () => {
     setLoading(true);
     try {
       // Replace with your actual POST endpoint
-      const response = await fetch("http://localhost:3001/create-checkout-session", {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: Math.round(Number(amount) * 100) }),
