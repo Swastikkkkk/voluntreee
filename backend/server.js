@@ -1,51 +1,100 @@
-
-const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const Stripe = require("stripe");
-
-// Load environment variables
-dotenv.config();
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const Stripe = require('stripe');
 
 const app = express();
-app.use(cors());
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const PORT = process.env.PORT || 3001;
+
+// CORS: allow only your frontend
+app.use(cors({
+  origin: [process.env.FRONTEND_URL, 'http://localhost:3000']
+}));
+
+// For JSON endpoints
 app.use(express.json());
 
-// Initialize Stripe with secret key
-const stripe = Stripe("sk_test_51RQhMx070ajDSpWDa86fquq0abTdgMM3OnQkrBF4M2kyDZsyLVKFeHmdS3QEHg8zopU7vpvSQZtrTv43X2LKzvtP00HqGHV3wj");
-
-// Create Checkout Session Route
-app.post("/create-checkout-session", async (req, res) => {
-  const { priceId, planName } = req.body;
-
-  if (!priceId) {
-    return res.status(400).json({ error: "Missing priceId" });
-  }
+// For Stripe webhook: needs raw body
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  let event;
 
   try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.log(`Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object;
+      console.log('Payment succeeded for session:', session.id);
+      // Add your post-payment logic here
+      break;
+    case 'payment_intent.payment_failed':
+      const paymentIntent = event.data.object;
+      console.log('Payment failed:', paymentIntent.id);
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
+// All other endpoints use JSON parser
+app.use(express.json());
+
+// Create checkout session endpoint
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    if (!amount || amount < 50) {
+      return res.status(400).json({ error: 'Invalid amount. Minimum is ₹0.50' });
+    }
+
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      payment_method_types: ["card"],
+      payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: 'inr',
+            product_data: {
+              name: 'Donation',
+              description: 'Thank you for your generous donation!',
+            },
+            unit_amount: amount, // Amount in paise
+          },
           quantity: 1,
         },
       ],
-      success_url: "http://localhost:3000/success?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: "http://localhost:3000/cancel",
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
       metadata: {
-        planName: planName,
-      },
+        type: 'donation'
+      }
     });
 
-    res.json({ sessionId: session.id });
+    res.json({ url: session.url });
   } catch (error) {
-    console.error("Error creating checkout session:", error);
-    res.status(500).json({ error: "Failed to create checkout session" });
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
 
-// Start Server
-const PORT = process.env.PORT || 4242;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
+});
